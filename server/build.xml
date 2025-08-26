@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="CRUD-TCP-Server" default="compile" basedir=".">
+
+    <property name="src.dir" value="src"/>
+    <property name="build.dir" value="bin"/>
+    <property name="lib.dir" value="lib"/>
+
+    <!-- Limpeza -->
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <mkdir dir="${build.dir}"/>
+    </target>
+
+    <!-- Compilação -->
+    <target name="compile" depends="clean">
+        <javac srcdir="${src.dir}"
+               destdir="${build.dir}"
+               includeantruntime="false"
+               encoding="UTF-8"
+               source="11"
+               target="11">
+            <classpath>
+                <fileset dir="${lib.dir}" includes="**/*.jar" erroronmissingdir="false"/>
+            </classpath>
+        </javac>
+        <echo message="Compilação concluída com sucesso!"/>
+    </target>
+
+    <!-- JAR do Servidor -->
+    <target name="jar-server" depends="compile">
+        <jar destfile="crud-server.jar" basedir="${build.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="com.crud.server.CRUDServer"/>
+            </manifest>
+        </jar>
+        <echo message="JAR do servidor criado: crud-server.jar"/>
+    </target>
+
+    <!-- JAR do Cliente -->
+    <target name="jar-client" depends="compile">
+        <jar destfile="crud-client.jar" basedir="${build.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="com.crud.client.CRUDClient"/>
+            </manifest>
+        </jar>
+        <echo message="JAR do cliente criado: crud-client.jar"/>
+    </target>
+
+    <!-- Criar todos os JARs -->
+    <target name="jars" depends="jar-server,jar-client">
+        <echo message="Todos os JARs criados com sucesso!"/>
+    </target>
+
+    <!-- Executar servidor -->
+    <target name="run-server" depends="compile">
+        <java classname="com.crud.server.CRUDServer"
+              classpath="${build.dir}"
+              fork="true"/>
+    </target>
+
+    <!-- Executar cliente -->
+    <target name="run-client" depends="compile">
+        <java classname="com.crud.client.CRUDClient"
+              classpath="${build.dir}"
+              fork="true"/>
+    </target>
+
+</project>
