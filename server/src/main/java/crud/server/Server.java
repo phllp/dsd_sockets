@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 
 import crud.repository.RepositoryManager;
 import crud.service.MessageProcessor;
@@ -33,7 +34,7 @@ public class Server {
                 try (Socket conn = server.accept()) {
                     String clientAddress = conn.getInetAddress().getHostAddress();
                     System.out.println("Conectado com " + clientAddress);
-                    processarConexao(conn);
+                    processarConexao(conn);        // mantém a sessão até cliente fechar/QUIT
                 }
                 System.out.println("Desconectado");
             }
@@ -41,58 +42,73 @@ public class Server {
             System.err.println("Erro no servidor: " + e.getMessage());
         }
     }
-
+    
     private void processarConexao(Socket conn) {
-        try (BufferedReader readerInput = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-            BufferedWriter writerOutput = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream()));
+        try (
+            BufferedReader readerInput = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+            BufferedWriter writerOutput = new BufferedWriter(
+                new OutputStreamWriter(conn.getOutputStream(), StandardCharsets.UTF_8))
+        ) {
             String mensagem;
-            if ((mensagem = readerInput.readLine())!= null) {
-                String mensagemRetorno = messageProcessor.processMessage(mensagem);
-
-                if(mensagemRetorno != null) {
-                    writerOutput.write(mensagemRetorno);
+            while ((mensagem = readerInput.readLine()) != null) {
+                String cmd = mensagem.trim();
+                if (cmd.isEmpty()) {
+                    // resposta vazia, mas sinaliza término
+                    writerOutput.write("<END>");
                     writerOutput.newLine();
                     writerOutput.flush();
-                } else {
-                    writerOutput.newLine();
-                    writerOutput.flush();
+                    continue;
                 }
+
+                // comando para encerrar a sessão
+                if ("QUIT".equalsIgnoreCase(cmd)) {
+                    writerOutput.write("BYE");
+                    writerOutput.newLine();
+                    writerOutput.write("<END>");
+                    writerOutput.newLine();
+                    writerOutput.flush();
+                    break; // sai do loop => fecha socket (try-with-resources)
+                }
+
+                // processamento normal
+                String resposta = messageProcessor.processMessage(cmd);
+                if (resposta != null && !resposta.isEmpty()) {
+                    for (String linha : resposta.split("\r")) {
+                        writerOutput.write(linha);
+                        writerOutput.newLine();
+                    }
+                }
+                // marca fim da resposta
+                writerOutput.write("<END>");
+                writerOutput.newLine();
+                writerOutput.flush();
             }
-            writerOutput.close();
         } catch (IOException e) {
             System.err.println("Erro ao processar conexão: " + e.getMessage());
         }
     }
-
+    
+    
     public static void main(String[] args) {
         int port = 8080;
 
-        try {
-            if (args.length > 1) {
-                System.err.println("Muitos argumentos!");
-                return;
+        if (args.length > 1) {
+            System.err.println("Muitos argumentos!");
+            return;
+        }
+        if (args.length == 1) {
+            try { port = Integer.parseInt(args[0]); }
+            catch (NumberFormatException e) {
+                System.err.println("Porta inválida, precisa ser um número");
             }
-            if (args.length > 0) {
-                try {
-                    port = Integer.parseInt(args[0]);
-                } catch (NumberFormatException e) {
-                    System.err.println("Porta inválida, precisa ser um número");
-                }
-            }
-
-
-            // Validações
-            if (port < 1 || port > 65535) {
-                System.err.println("Porta deve estar entre 1 e 65535!");
-                return;
-            }
-
-        } catch (NumberFormatException e) {
-            System.err.println("Porta inválida: " + args[0]);
+        }
+        if (port < 1 || port > 65535) {
+            System.err.println("Porta deve estar entre 1 e 65535!");
             return;
         }
 
-        Server servidor = new Server(port);
-        servidor.iniciar();
+        new Server(port).iniciar();
     }
+ 
 }

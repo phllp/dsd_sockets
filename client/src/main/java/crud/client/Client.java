@@ -5,40 +5,76 @@ import java.net.*;
 import java.util.Scanner;
 
 public class Client {
-    private final String host;
-    private final int port;
-    private final Scanner scanner;
+	 private final String host;
+	    private final int port;
+	    private final Scanner scanner;
+	    
+	    // Conexão persistente
+	    private Socket socket;
+	    private PrintWriter out;
+	    private BufferedReader in;
 
-    public Client(String host, int port) {
-        this.host = host;
-        this.port = port;
-        this.scanner = new Scanner(System.in);
-    }
+	    public Client(String host, int port) {
+	        this.host = host;
+	        this.port = port;
+	        this.scanner = new Scanner(System.in);
+	    }
 
-    /**
-     * Envia mensagem para o servidor e retorna a resposta
-     */
-    private String sendMessage(String message) throws IOException {
-        try (Socket socket = new Socket(host, port);
-             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+	    /**
+	     * Estabelece conexão com o servidor
+	     */
+	    private void conectar() throws IOException {
+	        if (socket == null || socket.isClosed()) {
+	            socket = new Socket(host, port);
+	            out = new PrintWriter(socket.getOutputStream(), true);
+	            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+	            System.out.println("Conectado ao servidor " + host + ":" + port);
+	        }
+	    }
 
-            System.out.println("Conectado ao servidor " + host + ":" + port);
+	    /**
+	     * Fecha a conexão com o servidor
+	     */
+	    private void desconectar() {
+	        try {
+	            if (out != null) {
+	                out.println("QUIT"); // Sinal para o servidor encerrar
+	            }
+	            if (in != null) {
+	                in.close();
+	            }
+	            if (out != null) {
+	                out.close();
+	            }
+	            if (socket != null && !socket.isClosed()) {
+	                socket.close();
+	            }
+	            System.out.println("Conexão fechada");
+	        } catch (IOException e) {
+	            System.err.println("Erro ao fechar conexão: " + e.getMessage());
+	        }
+	    }
 
-            // Envia mensagem
-            out.println(message);
+	    /**
+	     * Envia mensagem para o servidor e retorna a resposta
+	     */
+	    private String sendMessage(String message) throws IOException {
+	        conectar(); // Garante que está conectado
+	        
+	        // Envia mensagem
+	        out.println(message);
+	        
+	        // Lê resposta
+	        StringBuilder response = new StringBuilder();
+	        String line;
+	        while ((line = in.readLine()) != null) {
+	            if ("<END>".equals(line)) break;
+	            response.append(line).append("\n");
+	        }
+	        
+	        return response.toString().trim();
+	    }
 
-            // Lê resposta
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = in.readLine()) != null) {
-                response.append(line).append("\n");
-            }
-
-            System.out.println("Conexão fechada");
-            return response.toString().trim();
-        }
-    }
 
     /**
      * Exibe o menu principal
@@ -732,41 +768,47 @@ public class Client {
     public void start() {
         System.out.println("Cliente do Sistema de Gestão de Aviação iniciado");
         System.out.println("Conectando ao servidor " + host + ":" + port);
+        
+        try {
+        	 while (true) {
+                 showMainMenu();
+                 String option = scanner.nextLine().trim();
 
-        while (true) {
-            showMainMenu();
-            String option = scanner.nextLine().trim();
-
-            switch (option) {
-                case "1":
-                    handleTripulante();
-                    break;
-                case "2":
-                    handlePassageiro();
-                    break;
-                case "3":
-                    handleAviao();
-                    break;
-                case "4":
-                    handleTripulacao();
-                    break;
-                case "5":
-                    handleRelatorios();
-                    pause();
-                    break;
-                case "6":
-                    System.out.println("Encerrando cliente...");
-                    scanner.close();
-                    return;
-                default:
-                    System.out.println("❌ Opção inválida");
-                    pause();
-            }
-        }
+                 switch (option) {
+                     case "1":
+                         handleTripulante();
+                         break;
+                     case "2":
+                         handlePassageiro();
+                         break;
+                     case "3":
+                         handleAviao();
+                         break;
+                     case "4":
+                         handleTripulacao();
+                         break;
+                     case "5":
+                         handleRelatorios();
+                         pause();
+                         break;
+                     case "6":
+                         System.out.println("Encerrando cliente...");
+                         desconectar();
+                         scanner.close();
+                         return;
+                     default:
+                         System.out.println("❌ Opção inválida");
+                         pause();
+                 }
+             }
+		} catch (Exception e) {
+			desconectar();
+		} 
+       
     }
 
     public static void main(String[] args) {
-        String host = "localhost";
+        String host = "10.15.120.175";
         int port = 8080;
 
         // Permite especificar host e porta via argumentos
